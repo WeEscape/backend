@@ -1,46 +1,47 @@
-const fs = require("fs");
-const path = require("path");
-const Sequelize = require("sequelize");
+const sequelize = require('./database');
 
-const basename = path.basename(__filename);
-const env = process.env.NODE_ENV || "development";
-const config = require(__dirname + "/../config/config.js")[env];
-const db = {};
+const sequelizeModels = function ({ sequelize, models }) {
+  return models.reduce((sequelized, model) => {
+    return {
+      ...sequelized,
+      [model]: require(`./${model}`)(sequelize),
+    };
+  }, {});
+};
+const models = [
+  'Home',
+  'Task',
+  'TaskCategory',
+  'TaskDidDate',
+  'User',
+  'UserTask',
+];
+const model = sequelizeModels({ sequelize, models });
+// console.dir(model);
 
-let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
-} else {
-  sequelize = new Sequelize(
-    config.database,
-    config.user,
-    config.password,
-    config
-  );
-}
+// 1:n associations
 
-fs.readdirSync(__dirname)
-  .filter((file) => {
-    return (
-      file.indexOf(".") !== 0 && file !== basename && file.slice(-3) === ".js"
-    );
-  })
-  .forEach((file) => {
-    const model = require(path.join(__dirname, file))(
-      sequelize,
-      Sequelize.DataTypes
-    );
-    db[model.name] = model;
-  });
+model.Home.hasMany(model.User);
+model.User.belongsTo(model.Home);
 
-Object.keys(db).forEach((modelName) => {
-  console.log("config", db[modelName]);
-  if (db[modelName].associate) {
-    db[modelName].associate(db);
-  }
+model.Home.hasMany(model.TaskCategory);
+model.TaskCategory.belongsTo(model.Home);
+
+model.TaskCategory.hasMany(model.Task);
+model.Task.belongsTo(model.TaskCategory);
+
+model.Task.hasMany(model.TaskDidDate);
+model.TaskDidDate.belongsTo(model.Task);
+
+
+// n:m association
+model.User.belongsToMany(model.Task, {
+  through: 'UserTask',
+  foreignKey: 'user_id',
+});
+model.Task.belongsToMany(model.User, {
+  through: 'UserTask',
+  foreignKey: 'task_id',
 });
 
-db.sequelize = sequelize;
-db.Sequelize = Sequelize;
-
-module.exports = db;
+module.exports = { sequelize, ...model };
